@@ -22,14 +22,14 @@ def main(page: ft.Page):
         page.snack_bar.open = True
         page.update()
 
-    # 地域リスト
+    # 地域の番号リスト
     region_list_view = ft.ListView(
         expand=True,
         spacing=10,
         padding=10,
     )
 
-    # 天気予報
+    # 天気を予報する部分
     forecast_view = ft.Column(
         expand=True,
         spacing=10,
@@ -93,28 +93,68 @@ def main(page: ft.Page):
             progress_bar.visible = False
             page.update()
 
-    # 天気予報を表示
     def display_forecast(data: Dict):
         forecast_view.controls.clear()
-        forecasts = data[0]["timeSeries"][0]  
-    # 予報日時と天気を表示
-        for i, date in enumerate(forecasts["timeDefines"]):
-            weather_code = forecasts["areas"][0]["weatherCodes"][i]
-            forecast_view.controls.append(
-                ft.Card(
+        try:
+            weekly_data = data[1]  # 週間予報データ
+            weather_forecasts = weekly_data["timeSeries"][0]
+            temp_forecasts = weekly_data["timeSeries"][1]
+            
+            # グリッドビューの作成
+            grid = ft.GridView(
+                expand=True,
+                runs_count=4,
+                max_extent=200,
+                child_aspect_ratio=0.8,
+                spacing=10,
+                run_spacing=10,
+                padding=20,
+            )
+            # 1週間分の予報を表示するぞ
+            for i in range(len(weather_forecasts["timeDefines"])):
+                date = weather_forecasts["timeDefines"][i]
+                weather_code = weather_forecasts["areas"][0]["weatherCodes"][i]
+                
+                try:
+                    min_temp = temp_forecasts["areas"][0]["tempsMin"][i]
+                    max_temp = temp_forecasts["areas"][0]["tempsMax"][i]
+                except (IndexError, KeyError):
+                    min_temp = max_temp = "--"
+
+                # 予報を表示する部分を作る
+                card = ft.Card(
                     content=ft.Container(
                         content=ft.Column(
-                            [
-                                ft.Text(format_date(date), size=18, weight="bold"),
-                                ft.Text(get_weather_text(weather_code)),
-                                ft.Text(get_weather_icon(weather_code), size=40),  
+                            controls=[
+                                ft.Text(format_date(date), size=16, weight="bold"),
+                                ft.Text(get_weather_icon(weather_code), size=25),
+                                ft.Text(get_weather_text(weather_code), size=16),
+                                ft.Text(
+                                    f"最低 {min_temp if min_temp != '--' else '不明'}°C",
+                                    size=16,
+                                    color=ft.colors.BLUE,
+                                    weight="bold",
+                                ),
+                                ft.Text(
+                                    f"最高 {max_temp if max_temp != '--' else '不明'}°C",
+                                    size=16,
+                                    color=ft.colors.RED,
+                                    weight="bold",
+                                ),
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
+                            spacing=10,
                         ),
-                        padding=10,
+                        padding=20,
                     )
                 )
-            )
+                grid.controls.append(card)
+            
+            forecast_view.controls.append(grid)
+            
+        except (KeyError, IndexError) as e:
+            show_error("週間予報データの取得に失敗しました。")
+        
         page.update()
 
     # 天気予報サイトのデザイん
@@ -138,15 +178,15 @@ def main(page: ft.Page):
 
     # データの読み込み
     load_region_list()
-
-# ここで定義した関数は、他の関数から呼び出すことができる
+# 日付をフォーマットする
 def format_date(date_str: str) -> str:
-# 日付を日本語表記に変換
     date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-    return date.strftime("%Y年%m月%d日")
+    weekdays = ["月", "火", "水", "木", "金", "土", "日"]
+    weekday = weekdays[date.weekday()]
+    return f"{date.month}/{date.day}\n({weekday})"
 
 def get_weather_text(code: str) -> str:
-# 天気コードに対応する天気を返す
+    # 天気コードに対応する天気を返す
     weather_codes = {
         "100": "晴れ",
         "101": "晴れ時々曇り",
@@ -171,21 +211,28 @@ def get_weather_text(code: str) -> str:
         "203": "曇り時々雪",
         "302": "雪",
         "114": "雪時々晴れ",
+        "402": "大雪",
+        "204": "雪時々雨",
+        "207": "雷雨時々雪",
+        "205": "雨時々雪",
+        "209": "雪時々雷雨",
+        "210": "雷雨時々雪",
+        "260": "雷雨時々曇り",
     }
     return weather_codes.get(code, f"不明な天気 (コード: {code})")
 
 def get_weather_icon(code: str) -> str:
-# 天気コードに対応する絵文字を返す
+    # 天気コードに対応する絵文字を返す
     weather_icons = {
         "100": "☀️",  # 晴れ
         "101": "🌤️",  # 晴れ時々曇り
         "102": "🌦️",  # 晴れ時々雨
         "200": "☁️",  # 曇り
-        "300": "🌧️",  # 雨
-        "400": "❄️",  # 雪
-        "500": "⛈️",  # 雷雨
-        "413": "❄️→🌧️",  # 雪のち雨
-        "314": "🌧️→❄️",  # 雨のち雪
+        "300": "🌧️", 
+        "400": "❄️", 
+        "500": "⛈️", 
+        "413": "❄️→🌧️", 
+        "314": "🌧️→❄️", 
         "201": "🌤️",
         "202": "☁️🌧️",
         "218": "☁️❄️",
@@ -199,12 +246,17 @@ def get_weather_icon(code: str) -> str:
         "203": "☁️❄️",
         "302": "❄️",
         "114": "❄️☀️",
-
-
-        
+        "402": "❄️❄️❄️",
+        "204": "❄️🌧️",
+        "207": "⛈️❄️",
+        "205": "🌧️❄️",
+        "209": "❄️⛈️",
+        "210": "⛈️❄️",
+        "260": "⛈️☁️",
     }
-    # 聞いたことも無い天気の場合は❓を返す
-    return weather_icons.get(code, "❓") 
+    # 聞いたことも無いような天気コードの場合は❓を返す
+    return weather_icons.get(code, "❓")
 
-# 起動
-ft.app(target=main)
+# 起動する
+if __name__ == "__main__":
+    ft.app(target=main)
