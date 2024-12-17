@@ -98,7 +98,8 @@ def main(page: ft.Page):
         expand=True,
     )
 
-    # 日付選択用のDatePickerを追加
+    # 日付を選択できるようにする
+    # 2024年1月1日から現在日までの日付を選択できるようにする
     date_picker = ft.DatePicker(
         on_change=lambda e: on_date_selected(e),
         first_date=datetime(2024, 1, 1),
@@ -112,7 +113,8 @@ def main(page: ft.Page):
     )
 
     selected_date_text = ft.Text("選択された日付: なし")
-
+    # 日付が選択されたときの処理
+    # 選択された日付の予報を表示
     def on_date_selected(e):
         if e.date:
             selected_date = e.date.strftime("%Y-%m-%d")
@@ -120,7 +122,7 @@ def main(page: ft.Page):
             if current_region_code:
                 show_forecast_for_date(current_region_code, selected_date)
         page.update()
-
+        
     def show_forecast_for_date(region_code: str, selected_date: str):
         history_data = db.get_forecast_by_date(region_code, selected_date)
         if history_data:
